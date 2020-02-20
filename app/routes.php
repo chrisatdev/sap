@@ -139,25 +139,7 @@ return function (App $app) {
                 "order"     => "`{$table_name}`.".$adapter->primary_key() . " DESC",
                 "page"      => $page
             ]);
-            /*
-            $prefix = str_replace( "_id", "" , $adapter->primary_key() );
-            $tmp = [];
-            foreach ($fetchAll['list'] as $key => $value) {
-                foreach ($value as $k => $v) {
-                    if ($k == "{$prefix}_id") {
-                        $tmp[$key]["{$prefix}_id"] = encrypt($v);
-                    } else {
-                        list( $fkprefix, $n) = explode( "_", $k );
-                        if( $prefix !== $fkprefix ){
-                            $tmp[$key][$fkprefix][$k] = $v; 
-                        } else {
-                            $tmp[$key][$k] = $v;
-                        }
-                    }
-                }
-            }
-            $fetchAll = array_replace($fetchAll, ['list' => $tmp]);
-            */
+
             $response->getBody()->write( json_encode( $fetchAll, JSON_NUMERIC_CHECK ) );
         }else{
             $statusCode = 401;

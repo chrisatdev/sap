@@ -228,4 +228,37 @@ return function (App $app) {
                         ->withStatus($statusCode);
     });
 
+    /**
+     * Get data of a single record
+     * by ID
+     */
+    $app->get('/credentials/{settings}/set_credential', function (Request $request, Response $response, array $args) use ($container) {
+        $statusCode = 200;
+        $auth = new Certificate\Credentials;
+        switch( $args['settings'] ){
+            case 'settings':
+                $r = $auth->setting_credentials();
+                if( !is_array( $r ) && $r > 0 ){
+                    $r = $auth->get_credentials( $r );
+                    $public_key = $r[0]['credential_public_key'];
+                    $private_key = $r[0]['credential_private_key'];
+                    $result['public_key'] = $public_key;
+                    $result['private_key'] = $private_key;
+                    $result['access_token'] = base64_encode("{$public_key}:{$private_key}");
+                    $result['expired_time'] = $r[0]['credential_expired'];
+                }else{
+                    $statusCode = 400;
+                    $result = $auth->bad_credentials_message($statusCode,'The settings for the credentials could not be created or are already created.');
+                }
+            break;
+        }
+
+        $response->getBody()->write( json_encode($result, JSON_NUMERIC_CHECK) );
+
+        return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus($statusCode);
+    });
+
+
 };

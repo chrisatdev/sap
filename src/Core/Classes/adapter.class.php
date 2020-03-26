@@ -23,6 +23,31 @@ class Adapter{
 	}
 
 	/**
+	 * create
+	 * @param string $sql An SQL string
+	 * @return mixed
+	 */
+	public function create( $sql, $type = "create" )
+	{
+		if( !empty( $sql ) ){
+			if ($this->conn == null) {
+				$this->connect();
+			}
+	
+			$sth = $this->conn->query($sql);
+			
+			if( $type == "insert" ){
+				return $this->conn->lastInsertId();
+			}else{
+				return json_encode( $sth );
+			}
+
+		}else{
+			return JSONResponseError(500, _("Query was empty"));
+		}
+	}
+
+	/**
 	 * query
 	 * @param string $sql An SQL string
 	 * @param array $array Paramters to bind
@@ -353,12 +378,10 @@ class Adapter{
 	}
 
 	public function validate($ob, $id){
-	
 		
 		foreach($ob->fields as $fieldName => $field){
 		
 			$value = isset($field['value']) ? trim($field['value']) : "";
-			
 			
 			if(strlen($value) == 0){
 				

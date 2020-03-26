@@ -3,18 +3,16 @@ namespace Certificate;
 use Cryptography\Encryption as Cryptography;
 use DI\ContainerBuilder;
 
+/**
+ * Basic credentials manager
+ * Pub: VSDuaBnWMBnoUORXYPJBhTAg5ffVl68y
+ * Priv: NG0fVD6bIdd5DN9G
+ */
+
 class Credentials extends \AbstractionModel
 {
 
-    var $owner = "";
-
-    var $info = "";
-
     var $expired = 0;
-
-    private $pub_k_long = 24;
-    
-    private $pri_k_long = 48;
     
     private $access_token = "";
 
@@ -36,30 +34,18 @@ class Credentials extends \AbstractionModel
     }
 
     public function generate_keys(){
-        
-        $phrase     = "{$this->owner}|{$this->info}";
 
-        $encrypt    = $this->crypto->encrypt( $phrase );
-
-        $public_key     = substr( $encrypt, 0, $this->pub_k_long );
-        $private_key    = substr( $encrypt, $this->pub_k_long, $this->pri_k_long );
-        $secret_key     = substr( $encrypt, $this->pub_k_long + $this->pri_k_long, strlen( $encrypt ) );
+        $public_key     = uniqcode($minLen=32,$maxLen=32,false);
+        $private_key    = uniqcode($minLen=16,$maxLen=16,false);
 
         return [
             'public_key'    => $public_key,
-            'private_key'   => $private_key,
-            'secret_key'    => $secret_key
+            'private_key'   => $private_key
         ];
     }
 
     public function generate_access_token( $public_key, $private_key ){
         return base64_encode("{$public_key}:{$private_key}");
-    }
-
-    public function decode_keys( $public_key, $private_key, $secret_key ){
-        $phrase     = "{$public_key}{$private_key}{$secret_key}";
-        $decrypt    = $this->crypto->decrypt( $phrase );
-        return $decrypt;
     }
 
     public function decode_access_token( $access_token ){
@@ -74,17 +60,12 @@ class Credentials extends \AbstractionModel
 
         $generate_keys = $this->generate_keys();
 
-        $access_token = $this->generate_access_token( $generate_keys['public_key'], $generate_keys['private_key'] );
-
-        $find_credential = $this->find( "site_id", $account );
+        $find_credential = $this->find( "credential_id", $account );
 
         $data = [
-            'site_id'               => $account,
             'credential_public_key' => $generate_keys['public_key'],
             'credential_private_key'=> $generate_keys['private_key'],
-            'credential_secret_key' => $generate_keys['secret_key'],
-            'credential_expired'    => $this->expired,
-            'credential_access_token'=> $access_token
+            'credential_expired'    => $this->expired
         ];
 
         if( haveRows( $find_credential ) ){
@@ -97,14 +78,12 @@ class Credentials extends \AbstractionModel
 
         }
 
-        $find_credential = $this->find( "site_id", $account );
+        $find_credential = $this->find( "credential_id", $account );
 
         return [
             'credential_id'             => $find_credential[0]['credential_id'],
-            'site_id'                   => $find_credential[0]['site_id'],
             'credential_public_key'     => $find_credential[0]['credential_public_key'],
-            'credential_private_key'    => $find_credential[0]['credential_private_key'],
-            'credential_access_token'   => $find_credential[0]['credential_access_token']
+            'credential_private_key'    => $find_credential[0]['credential_private_key']
         ];
     }
 
@@ -133,22 +112,18 @@ class Credentials extends \AbstractionModel
 
         $access_token = haveRows( $access_token ) ? $access_token[0] : $access_token;
         $access_token = str_replace("Bearer ","", $access_token);
-        
-        $find_credential = $this->find( "credential_access_token", $access_token );
+
+        $this->decode_access_token( $access_token );
+
+        $access_token = $this->get_decode_access_token();
+
+        list( $public_key, $private_key ) = explode(':',$access_token);
+
+        $find_credential = $this->find( "credential_public_key", $public_key, "credential_private_key={$private_key}" );
         
         if( haveRows( $find_credential ) ){
 
-            $phrase = $this->decode_keys( $find_credential[0]['credential_public_key'], $find_credential[0]['credential_private_key'], $find_credential[0]['credential_secret_key'] );
-
-            if( !empty( $phrase ) ){
-
-                return true;
-
-            }else{
-
-                return false;
-
-            }
+            return true;
 
         }else{
 
@@ -161,8 +136,53 @@ class Credentials extends \AbstractionModel
     public function bad_credentials_message( $statusCode = 401, $message = "Invalid credentials" ){
         return [
             'statusCode'=>$statusCode,
-            'message'=>'Unauthorized',
+            'message'=> $statusCode == 401 ? 'Unauthorized' : 'Bad request',
             'error'=>$message
         ];
+    }
+
+    public function get_credentials( $account_id ){
+        
+        $find_credential = $this->find( "credential_id", $account_id );
+        
+        if( haveRows( $find_credential ) ){
+
+            return $find_credential;
+
+        }else{
+
+            return false;
+
+        }
+    }
+
+    public function setting_credentials(){
+        $sql = "
+        CREATE TABLE `credentials` (
+        `credential_id` int(11) NOT NULL AUTO_INCREMENT,
+        `credential_public_key` varchar(32) NOT NULL,
+        `credential_private_key` varchar(32) NOT NULL,
+        `credential_expired` varchar(60) NOT NULL DEFAULT '0',
+        PRIMARY KEY (`credential_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ";
+
+        $r = $this->create( $sql );
+
+        $r = json_decode( $r, true );
+
+        if( !empty( $r["queryString"] ) ){
+
+            $keys = $this->generate_keys();
+            
+            $sql = "INSERT INTO credentials (credential_public_key,credential_private_key) VALUES ('{$keys['public_key']}','{$keys['private_key']}');";
+            
+            $id = $this->create( $sql, "insert" );
+
+            return $id;
+        }else{
+            return false;
+        }
+
     }
 }

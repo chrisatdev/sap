@@ -4,12 +4,9 @@ require '../src/Core/autoload.php';
 
 $credential = new \Certificate\Credentials;
 
-$credential->owner      = "grouposanti";
-$credential->data       = "grouposanti.com.py";
-$credential->expired    = "30 days";
-
-//$credential = $credential->generate_keys();
+//$credential = $credential->setting_credentials();
 //print_r( $credential );
+/*
 $site = "";
 //$site = $credential->save_credentials( 1 );
 print_r( $site );
@@ -18,3 +15,4 @@ $rr = "";
 $rr = $credential->valid_access_token( $access_token );
 print_r($rr);
 print "\n\r";
+*/

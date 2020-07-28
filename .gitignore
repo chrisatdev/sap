@@ -5,3 +5,4 @@
 !/logs/README.md
 /var/cache/*
 /app/settings.php
+/tests/

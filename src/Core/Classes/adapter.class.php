@@ -2,6 +2,7 @@
 namespace Classes\db;
 use \PDO;
 use DI\ContainerBuilder;
+date_default_timezone_set("America/Asuncion");
 
 class Adapter{
 	// Properties
@@ -23,31 +24,6 @@ class Adapter{
 	}
 
 	/**
-	 * create
-	 * @param string $sql An SQL string
-	 * @return mixed
-	 */
-	public function create( $sql, $type = "create" )
-	{
-		if( !empty( $sql ) ){
-			if ($this->conn == null) {
-				$this->connect();
-			}
-	
-			$sth = $this->conn->query($sql);
-			
-			if( $type == "insert" ){
-				return $this->conn->lastInsertId();
-			}else{
-				return json_encode( $sth );
-			}
-
-		}else{
-			return JSONResponseError(500, _("Query was empty"));
-		}
-	}
-
-	/**
 	 * query
 	 * @param string $sql An SQL string
 	 * @param array $array Paramters to bind
@@ -62,8 +38,12 @@ class Adapter{
 			}
 	
 			$sth = $this->conn->query($sql);
-			
-			return $sth->fetchAll($fetchMode);
+
+			if ( $this->conn->errorInfo()[1] ){
+				return JSONResponseError(500, $this->conn->errorInfo()[2]);
+			}else{
+				return $sth->fetchAll($fetchMode);
+			}
 		}else{
 			return JSONResponseError(500, _("Query was empty"));
 		}
@@ -103,14 +83,14 @@ class Adapter{
 		$fieldValues = rtrim($fieldValues, ',');
 
 		$sql = "INSERT INTO `{$this->dbname}`.`{$this->table}` ($fieldNames) VALUES ($fieldValues)";
-
 		$sth = $this->conn->query( $sql );
-
-		if ($this->conn->lastInsertId() > 0):
-			return JSONResponseCreated(["id"=>$this->conn->lastInsertId()],true);
-		else:
+		//pr($this->conn->errorInfo());
+		//pr($this->conn->errorCode());hule();
+		if ( number( $this->conn->errorInfo()[1] ) > 0 ){
 			return JSONResponseError(500, $this->conn->errorInfo()[2]);
-		endif;
+		}else{
+			return JSONResponseCreated(["id"=>$this->conn->lastInsertId()]);
+		}
 	}
 
 	/**
@@ -133,7 +113,10 @@ class Adapter{
 				}
 				$fieldDetails .= "`$key`='$value',";
 			}else{
-				if( !empty( $value ) && is_numeric($value) ){
+				//if( !empty( $value ) && is_numeric($value) ){
+				if($value === '0' || $value === 0 ){
+					$fieldDetails .= "`$key`=$value,";
+				}else if( !empty( $value ) && is_numeric($value) ){
 					$fieldDetails .= "`$key`=$value,";
 				}else{
 					$fieldDetails .= "`$key`=NULL,";
@@ -145,8 +128,7 @@ class Adapter{
 		$sql = "UPDATE `{$this->dbname}`.`{$this->table}` SET {$fieldDetails} WHERE {$where}";
 
 		$this->conn->query( $sql );
-
-		if( $this->errorCode() !== null ){
+		if( number( $this->conn->errorCode() ) == 0 ){
 			return JSONResponseOK();
 		}else{
 			return JSONResponseError(500, $this->conn->errorInfo()[2]);
@@ -166,11 +148,13 @@ class Adapter{
 			$this->connect();
 		}
 
-		$this->query("DELETE FROM `{$this->dbname}`.`{$this->table}` WHERE {$where} LIMIT {$limit}");
-		if( $this->errorCode() !== null ){
-			return JSONResponseError(500, $this->conn->errorInfo()[2]);
-		}else{
+		$sql = "DELETE FROM `{$this->dbname}`.`{$this->table}` WHERE {$where} LIMIT {$limit}";
+		
+		$this->conn->query( $sql );
+		if( number( $this->conn->errorCode() ) == 0 ){
 			return JSONResponseOK();
+		}else{
+			return JSONResponseError(500, $this->conn->errorInfo()[2]);
 		}
 	}
 
@@ -196,6 +180,30 @@ class Adapter{
 		$sql = "SELECT * FROM `{$this->dbname}`.`{$this->table}` WHERE {$field} = '{$value}' " . $opt;
 
 		return $this->query( $sql );
+	}
+
+	public function call_procedure($procedure_name, $in = null){
+
+		if(is_array($in)){
+
+			$in_arguments = "";
+
+			foreach($in as $argument){
+				$in_arguments .= "\"{$argument}\",";
+			}
+
+			$in_arguments = substr($in_arguments,0,-1);
+
+		}else{
+			$in_arguments = "\"$in\"";
+		}
+
+		$in_arguments = $in_arguments == null ? "" : $in_arguments;
+
+		$data = $this->query("CALL {$procedure_name}({$in_arguments})");
+
+		return count($data) > 1 ? $data : $data[0];
+
 	}
 
 	/**
@@ -279,7 +287,7 @@ class Adapter{
 		
 		$fields = $this->fields != "*" ? $this->fields : substr($full_fields, 0, -2);
 		$join = $this->fields != "*" ? $join : $joins;
-		//pr("SELECT {$fields} FROM `{$this->dbname}`.`{$this->table}` {$join}{$where}{$group}{$order}{$limit}");hule();
+
 		$sql = "SELECT {$fields} FROM `{$this->dbname}`.`{$this->table}` {$join}{$where}{$group}{$order}{$limit}";
 		$result = $this->query($sql);
 		return $result;
@@ -378,10 +386,12 @@ class Adapter{
 	}
 
 	public function validate($ob, $id){
+	
 		
 		foreach($ob->fields as $fieldName => $field){
 		
 			$value = isset($field['value']) ? trim($field['value']) : "";
+			
 			
 			if(strlen($value) == 0){
 				
@@ -476,6 +486,7 @@ class Adapter{
 				$this->pass,
 				array(\PDO::ATTR_ERRMODE => \PDO::ERRMODE_SILENT, \PDO::ATTR_PERSISTENT => true)
 			);
+			$this->conn->exec("SET time_zone='-4:00';");
 		} catch (\PDOException $e) {
 			hule($e->getMessage());
 		}

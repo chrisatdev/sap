@@ -43,8 +43,17 @@ $middleware = require __DIR__ . '/../app/middleware.php';
 $middleware($app);
 
 // Register routes
-$routes = require __DIR__ . '/../app/routes.php';
-$routes($app);
+$routes_crud = require __DIR__ . '/../app/routes/crud.php';
+$routes_crud($app);
+
+$routes_login = require __DIR__ . '/../app/routes/login.php';
+$routes_login($app);
+
+$routes_settings = require __DIR__ . '/../app/routes/settings.php';
+$routes_settings($app);
+
+$routes_custom = require __DIR__ . '/../app/routes/custom.php';
+$routes_custom($app);
 
 /** @var bool $displayErrorDetails */
 $displayErrorDetails = $container->get('settings')['displayErrorDetails'];

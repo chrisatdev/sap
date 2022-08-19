@@ -101,6 +101,8 @@ class Credentials extends \AbstractionModel
     }
 
     public function valid_access_token( $access_token = "" ){
+        
+        $find_credential = [];
 
         if( !$this->is_enabled ){
             return true;
@@ -110,16 +112,20 @@ class Credentials extends \AbstractionModel
             return false;
         }
 
-        $access_token = haveRows( $access_token ) ? $access_token[0] : $access_token;
-        $access_token = str_replace("Bearer ","", $access_token);
+        $token = haveRows( $access_token ) ? $access_token[0] : $access_token;
 
-        $this->decode_access_token( $access_token );
+        $token = str_replace("Bearer ","", $token);
 
-        $access_token = $this->get_decode_access_token();
+        if( strlen( $token ) > 60 ){
+            
+            $this->decode_access_token( $token );
+            
+            $decode_token = $this->get_decode_access_token();
 
-        list( $public_key, $private_key ) = explode(':',$access_token);
-
-        $find_credential = $this->find( "credential_public_key", $public_key, "credential_private_key={$private_key}" );
+            list( $public_key, $private_key ) = explode( ':',$decode_token );
+            
+            $find_credential = $this->find( "credential_public_key", $public_key, "credential_private_key='{$private_key}'" );
+        }
         
         if( haveRows( $find_credential ) ){
 
